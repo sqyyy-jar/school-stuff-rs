@@ -1,52 +1,31 @@
 use crate::{
-    exporters::excalidraw::{Element, ExcalidrawFile},
-    matrix::Matrix2x2,
+    exporters::excalidraw::ExcalidrawFile,
+    matrix::{Matrix2x2, Matrix3x3},
 };
 
 pub mod exporters;
 pub mod matrix;
 
-fn draw_opening_bracket(file: &mut ExcalidrawFile, x: i32, y: i32, height: i32, locked: bool) {
-    file.elements.push(Element::draw_line(
-        x,
-        y,
-        locked,
-        vec![
-            [file.app_state.grid_size, 0],
-            [0, 0],
-            [0, height * file.app_state.grid_size],
-            [file.app_state.grid_size, height * file.app_state.grid_size],
-        ],
-    ));
-}
-
-fn draw_closing_bracket(file: &mut ExcalidrawFile, x: i32, y: i32, height: i32, locked: bool) {
-    file.elements.push(Element::draw_line(
-        x,
-        y,
-        locked,
-        vec![
-            [-file.app_state.grid_size, 0],
-            [0, 0],
-            [0, height * file.app_state.grid_size],
-            [-file.app_state.grid_size, height * file.app_state.grid_size],
-        ],
-    ));
-}
-
 fn main() {
     let mut m = Matrix2x2::new([[90_000., 300.], [360_000., 600.]], [620., 0.]);
-    println!("m = {:#}", m);
     m.mul_to(0, -4., 1);
-    println!("=> {:#}", m);
     m.div(1, -600.);
-    println!("=> {:#}", m);
     m.mul_to(1, -300., 0);
-    println!("=> {:#}", m);
     m.div(0, 90_000.);
-    println!("=> {:#}", m);
+    let mut m1 = Matrix3x3::new(
+        [[6., 4., -1.], [-7., -8., -3.], [4., -2., 1.]],
+        [0., 5., 22.],
+    );
+    m1.add_to(2, 0)
+        .add_to(0, 2)
+        .mul_to(2, 3., 1)
+        .mul_to(0, -3.5, 1)
+        .div(1, -15.)
+        .mul_to(1, -2., 0)
+        .div(0, 10.)
+        .mul_to(0, -14., 2);
     let mut file = ExcalidrawFile::default();
-    draw_opening_bracket(&mut file, 0, 0, 10, false);
-    draw_closing_bracket(&mut file, 80, 0, 10, false);
-    println!("{}", file.to_string());
+    file.draw(&m, 0, 0, false);
+    file.draw(&m1, 0, 120, false);
+    println!("{}", serde_json::to_string(&file).unwrap());
 }

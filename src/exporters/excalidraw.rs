@@ -1,6 +1,10 @@
-use serde_json::{json, Map, Value};
+use serde::Serialize;
+use serde_json::{Map, Value};
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExcalidrawFile {
+    pub r#type: String,
     pub version: i32,
     pub source: Option<String>,
     pub elements: Vec<Element>,
@@ -8,9 +12,16 @@ pub struct ExcalidrawFile {
     pub files: Map<String, Value>,
 }
 
+impl ExcalidrawFile {
+    pub fn draw(&mut self, element: &impl Drawable, x: i32, y: i32, locked: bool) -> (i32, i32) {
+        element.draw(self, x, y, locked)
+    }
+}
+
 impl Default for ExcalidrawFile {
     fn default() -> Self {
         Self {
+            r#type: "excalidraw".into(),
             version: 2,
             source: None,
             elements: Vec::with_capacity(0),
@@ -20,22 +31,10 @@ impl Default for ExcalidrawFile {
     }
 }
 
-impl ToString for ExcalidrawFile {
-    fn to_string(&self) -> String {
-        json!(
-            {
-                "type": "excalidraw",
-                "version": self.version,
-                "source": self.source.clone(),
-                "elements": self.elements.iter().map(|it| it.into()).collect::<Vec<Value>>(),
-                "app_state": Into::<Value>::into(&self.app_state)
-            }
-        )
-        .to_string()
-    }
-}
-
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
 pub enum Element {
+    #[serde(rename_all = "camelCase")]
     Text {
         x: i32,
         y: i32,
@@ -58,6 +57,7 @@ pub enum Element {
         vertical_align: String,
         baseline: i32,
     },
+    #[serde(rename_all = "camelCase")]
     Line {
         x: i32,
         y: i32,
@@ -74,6 +74,23 @@ pub enum Element {
         stroke_sharpness: String,
         locked: bool,
         points: Vec<[i32; 2]>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Rectangle {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        angle: i32,
+        stroke_color: String,
+        background_color: String,
+        fill_style: String,
+        stroke_width: i32,
+        stroke_style: String,
+        roughness: i32,
+        opacity: i32,
+        stroke_sharpness: String,
+        locked: bool,
     },
 }
 
@@ -184,7 +201,40 @@ impl Element {
         }
     }
 
-    pub fn small_monospaced_text(x: i32, y: i32, locked: bool, text: String) -> Self {
+    pub fn rectangle(
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        angle: i32,
+        stroke_color: String,
+        background_color: String,
+        fill_style: String,
+        stroke_width: i32,
+        stroke_style: String,
+        opacity: i32,
+        stroke_sharpness: String,
+        locked: bool,
+    ) -> Self {
+        Self::Rectangle {
+            x,
+            y,
+            width,
+            height,
+            angle,
+            stroke_color,
+            background_color,
+            fill_style,
+            stroke_width,
+            stroke_style,
+            roughness: 0,
+            opacity,
+            stroke_sharpness,
+            locked,
+        }
+    }
+
+    pub fn draw_small_monospaced_text(x: i32, y: i32, locked: bool, text: String) -> Self {
         Self::text(
             x,
             y,
@@ -207,12 +257,7 @@ impl Element {
         )
     }
 
-    pub fn draw_line(
-        x: i32,
-        y: i32,
-        locked: bool,
-        points: Vec<[i32; 2]>,
-    ) -> Self {
+    pub fn simple_line(x: i32, y: i32, locked: bool, points: Vec<[i32; 2]>) -> Self {
         let mut min_x = 0;
         let mut max_x = 0;
         let mut min_y = 0;
@@ -248,95 +293,28 @@ impl Element {
             points,
         )
     }
-}
 
-impl Into<Value> for &Element {
-    fn into(self) -> Value {
-        match self {
-            Element::Text {
-                x,
-                y,
-                width,
-                height,
-                angle,
-                stroke_color,
-                background_color,
-                fill_style,
-                stroke_width,
-                stroke_style,
-                roughness,
-                opacity,
-                stroke_sharpness,
-                locked,
-                text,
-                font_size,
-                font_family,
-                text_align,
-                vertical_align,
-                baseline,
-            } => json!(
-                {
-                    "type": "text",
-                    "x": x,
-                    "y": y,
-                    "width": width,
-                    "height": height,
-                    "angle": angle,
-                    "strokeColor": stroke_color,
-                    "backgroundColor": background_color,
-                    "fillStyle": fill_style,
-                    "strokeWidth": stroke_width,
-                    "strokeStyle": stroke_style,
-                    "roughness": roughness,
-                    "opacity": opacity,
-                    "strokeSharpness": stroke_sharpness,
-                    "locked": locked,
-                    "text": text,
-                    "fontSize": font_size,
-                    "fontFamily": font_family,
-                    "textAlign": text_align,
-                    "verticalAlign": vertical_align,
-                    "baseline": baseline,
-                }
-            ),
-            Element::Line {
-                x,
-                y,
-                width,
-                height,
-                angle,
-                stroke_color,
-                background_color,
-                fill_style,
-                stroke_width,
-                stroke_style,
-                roughness,
-                opacity,
-                stroke_sharpness,
-                locked,
-                points,
-            } => json!({
-                "type": "line",
-                "x": x,
-                "y": y,
-                "width": width,
-                "height": height,
-                "angle": angle,
-                "strokeColor": stroke_color,
-                "backgroundColor": background_color,
-                "fillStyle": fill_style,
-                "strokeWidth": stroke_width,
-                "strokeStyle": stroke_style,
-                "roughness": roughness,
-                "opacity": opacity,
-                "strokeSharpness": stroke_sharpness,
-                "locked": locked,
-                "points": points,
-            }),
-        }
+    pub fn simple_rectangle(x: i32, y: i32, width: i32, height: i32, locked: bool) -> Self {
+        Self::rectangle(
+            x,
+            y,
+            width,
+            height,
+            elements::ANGLE,
+            elements::STROKE_COLOR.into(),
+            elements::BACKGROUND_COLOR.into(),
+            elements::FILL_STYLE.into(),
+            elements::STROKE_WIDTH,
+            elements::STROKE_STYLE.into(),
+            elements::OPACITY,
+            elements::STROKE_SHARPNESS.into(),
+            locked,
+        )
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppState {
     pub grid_size: i32,
     pub view_background_color: String,
@@ -351,15 +329,9 @@ impl Default for AppState {
     }
 }
 
-impl Into<Value> for &AppState {
-    fn into(self) -> Value {
-        json!(
-            {
-                "gridSize": self.grid_size,
-                "viewBackgroundColor": self.view_background_color.clone(),
-            }
-        )
-    }
+pub trait Drawable {
+    /// Draw the element onto a file
+    /// 
+    /// Returns the width and height of the drawn element
+    fn draw(&self, file: &mut ExcalidrawFile, x: i32, y: i32, locked: bool) -> (i32, i32);
 }
-
-pub enum FontFamily {}
